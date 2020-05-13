@@ -1,4 +1,3 @@
-#![feature(option_result_contains)]
 extern crate serde;
 extern crate quick_xml;
 
@@ -66,6 +65,7 @@ fn check_if_exists(page_data: &SiteMap) -> bool {
 }
 
 fn write_file(path: String, content: &String) {
+    println!("Writing {}", path);
     let dir = fs::create_dir_all(format!("static{}", path)).unwrap();
     let content = content.replace("https://ghost.rolisz.ro", "https://rolisz.ro");
     fs::write(format!("static{}/index.html", path), content);
@@ -81,14 +81,13 @@ fn write_xml(path: String, content: &String) {
 
 fn has_bad_extension(url: &&str) -> bool{
     let ext = Path::new(&url).extension();
-    ext.is_none()
+    ext.is_none() && !url.ends_with("/rss/")
     //return url.ends_with("ico") || url.to_lowercase().ends_with("jpg") || url.to_lowercase().ends_with("png")
 }
 
 fn get_links_from_html(html: &String) -> HashSet<String> {
      Document::from(html.as_str())
             .find(Name("a").or(Name("link")))
-            .filter(|x| !x.attr("rel").contains(&"amphtml".to_string()))
             .filter_map(|n| n.attr("href"))
             .filter(has_bad_extension)
             .filter_map(|x| {
@@ -161,11 +160,17 @@ fn main() -> Result<(), reqwest::Error> {
     get_non_html(&client, &"https://ghost.rolisz.ro/sitemap.xsl".to_string());
     get_non_html(&client, &"https://ghost.rolisz.ro/robots.txt".to_string());
     get_non_html(&client, &"https://ghost.rolisz.ro/404.html".to_string());
-
+    get_page(&client, &"https://ghost.rolisz.ro/rss".to_string());
+    get_page(&client, &"https://ghost.rolisz.ro/personal/rss".to_string());
+    get_page(&client, &"https://ghost.rolisz.ro/tech/rss".to_string());
+    get_page(&client, &"https://ghost.rolisz.ro/ghost/api/v3/content/posts/?key=55469b5d4503c566ce6601684e&limit=all&fields=title%2Curl%2Cexcerpt%2Ccustom_excerpt%2Cpublished_at%2Cupdated_at&order=updated_at%20DESC&include=tags&formats=plaintext".to_string());
 
     for link in html.sitemap {
         let link_url = &link.loc;
-
+        // Pages are handled separately elsewhere, because RSS is included here.
+        if link_url.ends_with("sitemap-pages.xml") {
+            continue;
+        }
         let mut body  = get_non_html(&client, link_url).unwrap();
         visited.lock().unwrap().insert(link_url.to_string());
 
@@ -184,7 +189,7 @@ fn main() -> Result<(), reqwest::Error> {
 
     }
 
-    let mut links : Vec<String> = Vec::new();
+    let mut links : Vec<String> = vec![];
     for v in new_links.lock().unwrap().iter() {
         links.push(v.to_string());
     }
