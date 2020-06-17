@@ -1,7 +1,7 @@
 extern crate serde;
 extern crate quick_xml;
 
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 use quick_xml::de::{from_str, DeError};
 use std::time::{Duration, Instant};
 use quick_xml::Reader;
@@ -62,6 +62,18 @@ fn check_if_exists(page_data: &SiteMap) -> bool {
         }
     }
     return false;
+}
+
+
+fn check_if_exists_identically(url: String, content: String) -> bool {
+    let parsed = Url::parse(&url).unwrap();
+    let path = parsed.path();
+    let content = content.replace("https://ghost.rolisz.ro", "https://rolisz.ro");
+    let on_disk = fs::read_to_string(format!("static{}/index.html", path));
+    if let Ok(res) = on_disk {
+        return res == *content
+    }
+    false
 }
 
 fn write_file(path: String, content: &String) {
@@ -195,14 +207,16 @@ fn main() -> Result<(), reqwest::Error> {
     }
         println!("{:#?}", links);
 
-    let mut temp = HashSet::new();
     while !links.is_empty() {
+        let mut temp = HashSet::new();
         links.iter().for_each(|link| {
             if !visited.lock().unwrap().contains(link) {
                 let res = get_page(&client, &link);
                 visited.lock().unwrap().insert(link.to_string());
-                if res.is_some() {
-                    temp.extend(get_links_from_html(&res.unwrap()));
+                if let Some(res) = res {
+                    if (!check_if_exists_identically(link.to_string(),res.to_string())) {
+                        temp.extend(get_links_from_html(&res));
+                    }
                 }
             }
         });
