@@ -136,11 +136,6 @@ fn get_page(client: &reqwest::blocking::Client, post_url: &String) -> Option<Str
         let mut buffer = String::new();
         pg.read_to_string(&mut buffer).unwrap();
 
-        let links = get_links_from_html(&buffer);
-
-        write_file(pg.url().path().to_string(), &buffer);
-        //copy(&mut html, &mut file);
-
         return Some(buffer);
     }
     return None;
@@ -205,7 +200,7 @@ fn main() -> Result<(), reqwest::Error> {
     for v in new_links.lock().unwrap().iter() {
         links.push(v.to_string());
     }
-        println!("{:#?}", links);
+        println!("Links: {:#?}", links);
 
     while !links.is_empty() {
         let mut temp = HashSet::new();
@@ -214,8 +209,10 @@ fn main() -> Result<(), reqwest::Error> {
                 let res = get_page(&client, &link);
                 visited.lock().unwrap().insert(link.to_string());
                 if let Some(res) = res {
-                    if (!check_if_exists_identically(link.to_string(),res.to_string())) {
+                    if !check_if_exists_identically(link.to_string(), res.to_string()) {
                         temp.extend(get_links_from_html(&res));
+                        let url = Url::parse(link).unwrap();
+                        write_file(url.path().to_string(), &res);
                     }
                 }
             }
