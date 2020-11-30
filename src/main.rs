@@ -167,10 +167,14 @@ fn main() -> Result<(), reqwest::Error> {
     get_non_html(&client, &"https://ghost.rolisz.ro/sitemap.xsl".to_string());
     get_non_html(&client, &"https://ghost.rolisz.ro/robots.txt".to_string());
     get_non_html(&client, &"https://ghost.rolisz.ro/404.html".to_string());
-    get_page(&client, &"https://ghost.rolisz.ro/rss".to_string());
-    get_page(&client, &"https://ghost.rolisz.ro/personal/rss".to_string());
-    get_page(&client, &"https://ghost.rolisz.ro/tech/rss".to_string());
-    get_page(&client, &"https://ghost.rolisz.ro/ghost/api/v3/content/posts/?key=55469b5d4503c566ce6601684e&limit=all&fields=title%2Curl%2Cexcerpt%2Ccustom_excerpt%2Cpublished_at%2Cupdated_at&order=updated_at%20DESC&include=tags&formats=plaintext".to_string());
+    ["https://ghost.rolisz.ro/rss".to_string(), "https://ghost.rolisz.ro/personal/rss".to_string(),
+    "https://ghost.rolisz.ro/tech/rss".to_string(),
+    "https://ghost.rolisz.ro/ghost/api/v3/content/posts/?key=55469b5d4503c566ce6601684e&limit=all&fields=title%2Curl%2Cexcerpt%2Ccustom_excerpt%2Cpublished_at%2Cupdated_at&order=updated_at%20DESC&include=tags&formats=plaintext".to_string()
+    ].iter().for_each(|url| {
+        let res = get_page(&client, url);
+        let url = Url::parse(url).unwrap();
+        write_file(url.path().to_string(), &res.unwrap());
+    });
 
     for link in html.sitemap {
         let link_url = &link.loc;
@@ -191,7 +195,10 @@ fn main() -> Result<(), reqwest::Error> {
                 return
             }
             let res = get_page(&client, &post_link.loc);
-            new_links.lock().unwrap().extend(get_links_from_html(&res.unwrap()));
+            let url = Url::parse(&post_link.loc).unwrap();
+            let content = res.unwrap();
+            write_file(url.path().to_string(), &content);
+            new_links.lock().unwrap().extend(get_links_from_html(&content));
         });
 
     }
